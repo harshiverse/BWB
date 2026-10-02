@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Vijay</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header>
+    <h1>Vijay</h1>
+    <button id="lockBtn" title="Lock vault">🔒</button>
+  </header>
+
+  <section id="unlockView" class="view">
+    <p class="hint">Enter your passphrase to unlock your local memory.</p>
+    <input id="passphraseInput" type="password" placeholder="Passphrase" />
+    <button id="unlockBtn">Unlock</button>
+  </section>
+
+  <section id="mainView" class="view hidden">
+    <div class="searchRow">
+      <input id="queryInput" type="text" placeholder="Ask about anything you've browsed…" />
+      <button id="searchBtn">Search</button>
+    </div>
+
+    <div id="statusLine" class="status"></div>
+
+    <div id="answerBox" class="answer hidden">
+      <p id="answerText"></p>
+      <ul id="sourcesList" class="sources"></ul>
+    </div>
+
+    <div class="footerRow">
+      <button id="forgetHourBtn">Forget last hour</button>
+      <a href="../options/options.html" target="_blank">Settings</a>
+    </div>
+  </section>
+
+  <script src="popup.js" type="module"></script>
+</body>
+</html>
