@@ -2,23 +2,31 @@
 import { pipeline, env } from '@huggingface/transformers';
 
 // Configure environment for Chrome Extension Offscreen Document
-env.useBrowserCache = true;
+env.useBrowserCache = typeof caches !== 'undefined';
 env.allowLocalModels = false;
 
-if (env.backends?.onnx?.wasm) {
-  env.backends.onnx.wasm.numThreads = 1;
-}
+// Direct ONNX runtime to resolve WASM & JSEP files locally from the extension bundle
+const ortWasmPath = typeof chrome !== 'undefined' && chrome.runtime?.getURL
+  ? chrome.runtime.getURL('dist/ort/')
+  : '../dist/ort/';
+
+if (!env.backends) env.backends = {};
+if (!env.backends.onnx) env.backends.onnx = {};
+if (!env.backends.onnx.wasm) env.backends.onnx.wasm = {};
+
+env.backends.onnx.wasm.wasmPaths = ortWasmPath;
+env.backends.onnx.wasm.numThreads = 1;
 
 let extractorPromise = null;
 
 export async function getExtractor() {
   if (!extractorPromise) {
     extractorPromise = (async () => {
-      console.log('[offscreen-embedder] Initializing multilingual-e5-small pipeline...');
+      console.log('[offscreen-embedder] Initializing multilingual-e5-small pipeline with local ONNX runtime...');
       const pipe = await pipeline('feature-extraction', 'Xenova/multilingual-e5-small', {
         dtype: 'q8',
       });
-      console.log('[offscreen-embedder] Model loaded successfully.');
+      console.log('[offscreen-embedder] Model loaded successfully from local runtime.');
       return pipe;
     })();
   }
