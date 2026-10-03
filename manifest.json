@@ -1,15 +1,16 @@
 {
   "manifest_version": 3,
   "name": "Vijay — Private Local Memory & Search",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A privacy-first, on-device AI assistant that securely stores and intelligently searches your web, PDF, and YouTube content, with citation-backed answers.",
   "permissions": [
-    "storage",
-    "unlimitedStorage",
-    "alarms",
-    "idle",
-    "activeTab",
-    "scripting"
+  "storage",
+  "unlimitedStorage",
+  "alarms",
+  "idle",
+  "activeTab",
+  "scripting",
+  "offscreen"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -34,5 +35,18 @@
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  }
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "dist/ort/*"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ]
 }
