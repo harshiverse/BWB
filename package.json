@@ -1,0 +1,15 @@
+{
+  "name": "vijay-orma",
+  "version": "0.1.0",
+  "description": "On-device private memory and search Chrome extension with local multilingual embeddings",
+  "type": "module",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^3.3.3"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}
