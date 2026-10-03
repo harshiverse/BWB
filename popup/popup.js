@@ -4,7 +4,7 @@
 // and extension pages are the safest place the API is exposed.
 
 const $ = (id) => document.getElementById(id);
-const unlockView = $("unlockView"), mainView = $("mainView");
+const unlockView = $("unlockView"), mainView = $("mainView"), unlockStatus = $("unlockStatus");
 const passphraseInput = $("passphraseInput"), unlockBtn = $("unlockBtn"), lockBtn = $("lockBtn");
 const queryInput = $("queryInput"), searchBtn = $("searchBtn"), statusLine = $("statusLine");
 const answerBox = $("answerBox"), answerText = $("answerText"), sourcesList = $("sourcesList");
@@ -28,8 +28,13 @@ async function refreshLockState() {
 
 unlockBtn.addEventListener("click", async () => {
   if (!passphraseInput.value) return;
-  await send({ type: "UNLOCK_VAULT", passphrase: passphraseInput.value });
+  const result = await send({ type: "UNLOCK_VAULT", passphrase: passphraseInput.value });
   passphraseInput.value = "";
+  if (!result.unlocked) {
+    unlockStatus.textContent = "Wrong passphrase — try the one you used originally.";
+    return;
+  }
+  unlockStatus.textContent = "";
   await refreshLockState();
 });
 
@@ -96,6 +101,10 @@ async function runSearch() {
   }
   if (result.reason === "NO_MATCH") {
     statusLine.textContent = "No confident match found for that query.";
+    return;
+  }
+  if (result.reason === "ALL_UNDECRYPTABLE") {
+    statusLine.textContent = "Your saved data was encrypted with a different passphrase and can't be read. Wipe it from Settings and start fresh.";
     return;
   }
 

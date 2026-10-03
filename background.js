@@ -43,7 +43,10 @@ async function enqueue(job) {
 async function restoreSession() {
   if (isUnlocked()) return;
   const r = await chrome.storage.session.get(SESSION_PASS_KEY);
-  if (r[SESSION_PASS_KEY]) await unlockWithPassphrase(r[SESSION_PASS_KEY]);
+  if (r[SESSION_PASS_KEY]) {
+    const result = await unlockWithPassphrase(r[SESSION_PASS_KEY]);
+    if (!result.ok) await chrome.storage.session.remove(SESSION_PASS_KEY); // stale/garbage, drop it
+  }
 }
 
 chrome.idle.setDetectionInterval(60); // seconds
@@ -172,10 +175,19 @@ async function runQuery(rawQuery, { topK = 6 } = {}) {
   if (sinceMs) chunks = chunks.filter((c) => c.timestamp >= sinceMs);
   if (chunks.length === 0) return { answer: null, sources: [], reason: "NO_DATA" };
 
-  // Decrypt just-in-time, kept only in this function's memory.
-  const decrypted = await Promise.all(
+  // Decrypt just-in-time, kept only in this function's memory. A chunk
+  // encrypted under an earlier/different passphrase will fail to decrypt —
+  // skip it rather than letting one bad chunk fail the whole search.
+  const decryptAttempts = await Promise.allSettled(
     chunks.map(async (c) => ({ id: c.id, text: await decrypt(c.encrypted), meta: c }))
   );
+  const decrypted = decryptAttempts.filter((r) => r.status === "fulfilled").map((r) => r.value);
+  const skipped = decryptAttempts.length - decrypted.length;
+  if (skipped > 0) console.warn(`[vijay] skipped ${skipped} chunk(s) that failed to decrypt (likely old passphrase)`);
+
+  if (decrypted.length === 0 && chunks.length > 0) {
+    return { answer: null, sources: [], reason: "ALL_UNDECRYPTABLE" };
+  }
 
   const bm25Index = buildBm25Index(decrypted.map((d) => ({ id: d.id, text: d.text })));
   const bm25Results = bm25Search(bm25Index, cleanedQuery, topK * 2);
@@ -228,12 +240,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         break;
       }
 
-      case "UNLOCK_VAULT":
-        await unlockWithPassphrase(message.passphrase);
+      case "UNLOCK_VAULT": {
+        const result = await unlockWithPassphrase(message.passphrase);
+        if (!result.ok) {
+          sendResponse({ unlocked: false, reason: result.reason });
+          break;
+        }
         await chrome.storage.session.set({ [SESSION_PASS_KEY]: message.passphrase });
         sendResponse({ unlocked: true });
         drainQueue(); // flush anything captured while locked
         break;
+      }
 
       case "LOCK_VAULT":
         lock();

@@ -98,3 +98,5 @@ button:hover { opacity: 0.9; }
 #answerText { white-space: pre-wrap; }
 .linkBtn { background: none; color: #555; padding: 4px 0; font-weight: 500; text-decoration: underline; }
 .linkBtn:hover { color: var(--orange); opacity: 1; }
+
+.hint.error { color: #b91c1c; margin-top: 4px; min-height: 14px; }
