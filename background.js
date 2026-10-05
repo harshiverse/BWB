@@ -87,6 +87,39 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 });
 
 // ---------------------------------------------------------------------
+// MULTI-FORMAT: YouTube capture injection.
+// YouTube is a heavy SPA — switching videos doesn't fire a normal page
+// load, so we inject on both the initial load (tabs.onUpdated) and every
+// client-side navigation (webNavigation.onHistoryStateUpdated).
+// ---------------------------------------------------------------------
+function isYoutubeWatchUrl(url) {
+  return typeof url === "string" && /^https:\/\/(www\.)?youtube\.com\/watch\?/.test(url);
+}
+
+async function injectYoutubeCapture(tabId) {
+  try {
+    await chrome.scripting.executeScript({ target: { tabId }, files: ["lib/youtube-capture.js"] });
+  } catch (err) {
+    // Tab may have navigated away already, or isn't scriptable (chrome:// etc.) — safe to ignore.
+    console.warn("[vijay] youtube-capture injection skipped:", err.message);
+  }
+}
+
+chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
+  if (info.status === "complete" && isYoutubeWatchUrl(tab.url)) {
+    injectYoutubeCapture(tabId);
+  }
+});
+
+if (chrome.webNavigation?.onHistoryStateUpdated) {
+  chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
+    if (details.frameId === 0 && isYoutubeWatchUrl(details.url)) {
+      injectYoutubeCapture(details.tabId);
+    }
+  });
+}
+
+// ---------------------------------------------------------------------
 // Capture pipeline: dedupe (exact + near) -> embed -> encrypt -> store
 // ---------------------------------------------------------------------
 // Remove anything already stored from sensitive domains (e.g. captured before the
@@ -111,7 +144,14 @@ async function processCaptureJob(job) {
   }
 
   for (let i = 0; i < job.chunks.length; i++) {
-    const rawText = job.chunks[i];
+    // Chunks are usually plain strings (web/PDF). YouTube sends richer
+    // objects { text, startTimeSeconds } so each chunk can deep-link to
+    // the exact moment in the video, not just the job-level timestamp.
+    const chunkItem = job.chunks[i];
+    const isRichChunk = chunkItem && typeof chunkItem === "object";
+    const rawText = isRichChunk ? chunkItem.text : chunkItem;
+    const chunkStartTimeSeconds = isRichChunk ? chunkItem.startTimeSeconds ?? null : job.startTimeSeconds ?? null;
+
     const contentHash = await sha256Hex(rawText);
 
     const exactDupes = await findByContentHash(contentHash);
@@ -132,7 +172,7 @@ async function processCaptureJob(job) {
       title: job.title,
       sourceType: job.sourceType, // 'web' | 'pdf' | 'youtube'
       pageNumber: job.pageNumber ?? null,
-      startTimeSeconds: job.startTimeSeconds ?? null,
+      startTimeSeconds: chunkStartTimeSeconds,
       chunkIndex: i,
       timestamp: job.timestamp,
       contentHash,
